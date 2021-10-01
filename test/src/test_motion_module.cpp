@@ -12,9 +12,9 @@ TestMotionModule::TestMotionModule()
   module_name_  = "test_motion_module";
   control_mode_ = robotis_framework::PositionControl;
 
-  result_["r_sho_pitch"] = new robotis_framework::DynamixelState();
-  result_["r_sho_roll"] = new robotis_framework::DynamixelState();
-  result_["r_el"] = new robotis_framework::DynamixelState();
+  result_["joint5"] = new robotis_framework::DynamixelState();
+  result_["joint6"] = new robotis_framework::DynamixelState();
+  result_["joint7"] = new robotis_framework::DynamixelState();
 }
 
 TestMotionModule::~TestMotionModule()
@@ -41,9 +41,9 @@ void TestMotionModule::process(std::map<std::string, robotis_framework::Dynamixe
 
   // ...
 
-  result_["r_sho_pitch"]->goal_position_ = 0;
-  result_["r_sho_roll"]->goal_position_ = 0;
-  result_["r_el"]->goal_position_ = 0;
+  result_["joint5"]->goal_position_ = 0;
+  result_["joint6"]->goal_position_ = 0;
+  result_["joint7"]->goal_position_ = 0;
 }
 
 void TestMotionModule::stop()

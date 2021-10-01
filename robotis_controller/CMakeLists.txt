@@ -21,4 +21,10 @@ find_package(yaml-cpp REQUIRED)
 
 add_library(${LIB_CONTROLLER} src/robotis_controller/robotis_controller.cpp)
 target_include_directories(${LIB_CONTROLLER} PUBLIC include)
-target_link_libraries(${LIB_CONTROLLER} Boost::thread ${YAML_CPP_LIBRARIES} ${LIB_DEVICE} ${LIB_COMMON} dxl_x64_cpp)
+target_link_libraries(${LIB_CONTROLLER}
+    Boost::thread
+    ${YAML_CPP_LIBRARIES}
+    ${LIB_DEVICE}
+    ${LIB_COMMON}
+    dxl_x64_cpp
+)

@@ -3,15 +3,19 @@
 #include "robotis_controller/robotis_controller.h"
 #include "test_motion_module.hpp"
 
-int main()
+int main(int argc, char *argv[])
 {
-  test::TestMotionModule module;
+  if(argc < 4){
+    std::cerr << "引数が" << argc << "個です。足りません" << std::endl;
+    std::cerr << "例: $ ./test test.robot init.yaml offset.yaml" << std::endl;
+    return -1;
+  }
 
   robotis_framework::RobotisController *controller = robotis_framework::RobotisController::getInstance();
 
-  std::string offset_file = "offset_file.csv";
-  std::string robot_file = "robot_file.csv";
-  std::string init_file = "init_file.csv";
+  std::string robot_file = argv[1];
+  std::string init_file = argv[2];
+  std::string offset_file = argv[3];
 
   if (robot_file == "")
   {
