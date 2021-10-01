@@ -21,9 +21,8 @@
  *      Author: zerom
  */
 
-#include <ros/package.h>
-#include <ros/callback_queue.h>
 
+#include <iostream>
 #include "robotis_controller/robotis_controller.h"
 
 using namespace robotis_framework;
@@ -60,7 +59,7 @@ void RobotisController::initializeSyncWrite()
     {
       if (++error_count > 10)
       {
-        ROS_ERROR("[RobotisController] first bulk read fail!!");
+        std::cerr<<"[RobotisController] first bulk read fail!!"<<std::endl;
         exit(-1);
       }
       usleep(10 * 1000);
@@ -198,16 +197,17 @@ void RobotisController::initializeSyncWrite()
 
 bool RobotisController::initialize(const std::string robot_file_path, const std::string init_file_path)
 {
-  std::string dev_desc_dir_path = ros::package::getPath("robotis_device") + "/devices";
+  // std::string dev_desc_dir_path = ros::package::getPath("robotis_device") + "/devices";
+  std::string dev_desc_dir_path = "robotis_device_path/devices";
 
   // load robot info : port , device
   robot_ = new Robot(robot_file_path, dev_desc_dir_path);
 
-  if (gazebo_mode_ == true)
-  {
-    queue_thread_ = boost::thread(boost::bind(&RobotisController::msgQueueThread, this));
-    return true;
-  }
+  // if (gazebo_mode_ == true)
+  // {
+  //   queue_thread_ = boost::thread(boost::bind(&RobotisController::msgQueueThread, this));
+  //   return true;
+  // }
 
   for (auto& it : robot_->ports_)
   {
@@ -217,7 +217,7 @@ bool RobotisController::initialize(const std::string robot_file_path, const std:
 
     if (port->setBaudRate(port->getBaudRate()) == false)
     {
-      ROS_ERROR("PORT [%s] SETUP ERROR! (baudrate: %d)", port_name.c_str(), port->getBaudRate());
+      std::cerr<<"PORT ["<<port_name.c_str()<<"] SETUP ERROR! (baudrate: "<<port->getBaudRate()<<")"<<std::endl;
       exit(-1);
     }
 
@@ -330,13 +330,13 @@ bool RobotisController::initialize(const std::string robot_file_path, const std:
     {
       usleep(10 * 1000);
       if (ping(joint_name) != 0)
-        ROS_ERROR("JOINT[%s] does NOT respond!!", joint_name.c_str());
+        std::cerr<<"JOINT["<<joint_name.c_str()<<"] does NOT respond!!"<<std::endl;
     }
   }
 
   initializeDevice(init_file_path);
 
-  queue_thread_ = boost::thread(boost::bind(&RobotisController::msgQueueThread, this));
+  // queue_thread_ = boost::thread(boost::bind(&RobotisController::msgQueueThread, this));
   return true;
 }
 
@@ -344,7 +344,7 @@ void RobotisController::initializeDevice(const std::string init_file_path)
 {
   // device initialize
   if (DEBUG_PRINT)
-    ROS_WARN("INIT FILE LOAD");
+    std::cout<<"INIT FILE LOAD"<<std::endl;
 
   YAML::Node doc;
   try
@@ -366,11 +366,11 @@ void RobotisController::initializeDevice(const std::string init_file_path)
 
       if (dxl == NULL)
       {
-        ROS_WARN("Joint [%s] was not found.", joint_name.c_str());
+        std::cout<<"Joint ["<<joint_name.c_str()<<"] was not found."<<std::endl;
         continue;
       }
       if (DEBUG_PRINT)
-        ROS_INFO("JOINT_NAME: %s", joint_name.c_str());
+        std::cout<<"JOINT_NAME: "<<joint_name.c_str()<<std::endl;
 
       uint8_t torque_enabled = 0;
       read1Byte(joint_name, dxl->torque_enable_item_->address_, &torque_enabled);
@@ -380,14 +380,14 @@ void RobotisController::initializeDevice(const std::string init_file_path)
         std::string item_name = it_joint->first.as<std::string>();
 
         if (DEBUG_PRINT)
-          ROS_INFO("  ITEM_NAME: %s", item_name.c_str());
+          std::cout<<"  ITEM_NAME: "<<item_name.c_str()<<std::endl;
 
         uint32_t value = it_joint->second.as<uint32_t>();
 
         ControlTableItem *item = dxl->ctrl_table_[item_name];
         if (item == NULL)
         {
-          ROS_WARN("Control Item [%s] was not found.", item_name.c_str());
+          std::cout<<"Control Item ["<<item_name.c_str()<<"] was not found."<<std::endl;
           continue;
         }
 
@@ -420,7 +420,7 @@ void RobotisController::initializeDevice(const std::string init_file_path)
 
           if (torque_enabled == 1)
           {
-              ROS_ERROR("################\nThe initial value of the EEPROM area has been changed. \nTurn off Torque Enable and try again.");
+              std::cerr<<"################\nThe initial value of the EEPROM area has been changed. \nTurn off Torque Enable and try again."<<std::endl;
               exit(-1);
           }
         }
@@ -449,7 +449,7 @@ void RobotisController::initializeDevice(const std::string init_file_path)
     }
   } catch (const std::exception& e)
   {
-    ROS_INFO("Dynamixel Init file not found.");
+    std::cout<<"Dynamixel Init file not found."<<std::endl;
   }
 
   // [ BulkRead ] StartAddress : Present Position , Length : 10 ( Position/Velocity/Current )
@@ -506,7 +506,7 @@ void RobotisController::initializeDevice(const std::string init_file_path)
             {
               if (torque_enabled == 1)
               {
-                ROS_ERROR("################\nThe indirect address of the EEPROM area has been changed. \nTurn off Torque Enable and try again.");
+                std::cerr<<"################\nThe indirect address of the EEPROM area has been changed. \nTurn off Torque Enable and try again."<<std::endl;
                 exit(-1);
               }
               write2Byte(joint_name, indirect_addr, dxl->ctrl_table_[dxl->bulk_read_items_[i]->item_name_]->address_ + l);
@@ -619,79 +619,79 @@ void RobotisController::initializeDevice(const std::string init_file_path)
   }
 }
 
-void RobotisController::gazeboTimerThread()
-{
-  ros::Rate gazebo_rate(1000 / robot_->getControlCycle());
+// void RobotisController::gazeboTimerThread()
+// {
+//   ros::Rate gazebo_rate(1000 / robot_->getControlCycle());
 
-  while (!stop_timer_)
-  {
-    if (init_pose_loaded_ == true)
-      process();
-    gazebo_rate.sleep();
-  }
-}
+//   while (!stop_timer_)
+//   {
+//     if (init_pose_loaded_ == true)
+//       process();
+//     gazebo_rate.sleep();
+//   }
+// }
 
-void RobotisController::msgQueueThread()
-{
-  ros::NodeHandle ros_node;
-  ros::CallbackQueue callback_queue;
+// void RobotisController::msgQueueThread()
+// {
+//   ros::NodeHandle ros_node;
+//   ros::CallbackQueue callback_queue;
 
-  ros_node.setCallbackQueue(&callback_queue);
+//   ros_node.setCallbackQueue(&callback_queue);
 
-  /* subscriber */
-  ros::Subscriber write_control_table_sub = ros_node.subscribe("/robotis/write_control_table", 5,
-                                                               &RobotisController::writeControlTableCallback, this);
-  ros::Subscriber sync_write_item_sub     = ros_node.subscribe("/robotis/sync_write_item", 10,
-                                                               &RobotisController::syncWriteItemCallback, this);
-  ros::Subscriber joint_ctrl_modules_sub  = ros_node.subscribe("/robotis/set_joint_ctrl_modules", 10,
-                                                               &RobotisController::setJointCtrlModuleCallback, this);
-  ros::Subscriber enable_ctrl_module_sub  = ros_node.subscribe("/robotis/enable_ctrl_module", 10,
-                                                               &RobotisController::setCtrlModuleCallback, this);
-  ros::Subscriber control_mode_sub        = ros_node.subscribe("/robotis/set_control_mode", 10,
-                                                               &RobotisController::setControllerModeCallback, this);
-  ros::Subscriber joint_states_sub        = ros_node.subscribe("/robotis/set_joint_states", 10,
-                                                               &RobotisController::setJointStatesCallback, this);
-  ros::Subscriber enable_offset_sub       = ros_node.subscribe("/robotis/enable_offset", 10,
-                                                               &RobotisController::enableOffsetCallback, this);
+//   /* subscriber */
+//   ros::Subscriber write_control_table_sub = ros_node.subscribe("/robotis/write_control_table", 5,
+//                                                                &RobotisController::writeControlTableCallback, this);
+//   ros::Subscriber sync_write_item_sub     = ros_node.subscribe("/robotis/sync_write_item", 10,
+//                                                                &RobotisController::syncWriteItemCallback, this);
+//   ros::Subscriber joint_ctrl_modules_sub  = ros_node.subscribe("/robotis/set_joint_ctrl_modules", 10,
+//                                                                &RobotisController::setJointCtrlModuleCallback, this);
+//   ros::Subscriber enable_ctrl_module_sub  = ros_node.subscribe("/robotis/enable_ctrl_module", 10,
+//                                                                &RobotisController::setCtrlModuleCallback, this);
+//   ros::Subscriber control_mode_sub        = ros_node.subscribe("/robotis/set_control_mode", 10,
+//                                                                &RobotisController::setControllerModeCallback, this);
+//   ros::Subscriber joint_states_sub        = ros_node.subscribe("/robotis/set_joint_states", 10,
+//                                                                &RobotisController::setJointStatesCallback, this);
+//   ros::Subscriber enable_offset_sub       = ros_node.subscribe("/robotis/enable_offset", 10,
+//                                                                &RobotisController::enableOffsetCallback, this);
 
-  ros::Subscriber gazebo_joint_states_sub;
-  if (gazebo_mode_ == true)
-    gazebo_joint_states_sub = ros_node.subscribe("/" + gazebo_robot_name_ + "/joint_states", 10,
-                                                 &RobotisController::gazeboJointStatesCallback, this);
+//   ros::Subscriber gazebo_joint_states_sub;
+//   if (gazebo_mode_ == true)
+//     gazebo_joint_states_sub = ros_node.subscribe("/" + gazebo_robot_name_ + "/joint_states", 10,
+//                                                  &RobotisController::gazeboJointStatesCallback, this);
 
-  /* publisher */
-  goal_joint_state_pub_     = ros_node.advertise<sensor_msgs::JointState>("/robotis/goal_joint_states", 10);
-  present_joint_state_pub_  = ros_node.advertise<sensor_msgs::JointState>("/robotis/present_joint_states", 10);
-  current_module_pub_       = ros_node.advertise<robotis_controller_msgs::JointCtrlModule>(
-                                                              "/robotis/present_joint_ctrl_modules", 10);
+//   /* publisher */
+//   goal_joint_state_pub_     = ros_node.advertise<sensor_msgs::JointState>("/robotis/goal_joint_states", 10);
+//   present_joint_state_pub_  = ros_node.advertise<sensor_msgs::JointState>("/robotis/present_joint_states", 10);
+//   current_module_pub_       = ros_node.advertise<robotis_controller_msgs::JointCtrlModule>(
+//                                                               "/robotis/present_joint_ctrl_modules", 10);
 
-  if (gazebo_mode_ == true)
-  {
-    for (auto& it : robot_->dxls_)
-    {
-      gazebo_joint_position_pub_[it.first] = ros_node.advertise<std_msgs::Float64>(
-                                                "/" + gazebo_robot_name_ + "/" + it.first + "_position/command", 1);
-      gazebo_joint_velocity_pub_[it.first] = ros_node.advertise<std_msgs::Float64>(
-                                                "/" + gazebo_robot_name_ + "/" + it.first + "_velocity/command", 1);
-      gazebo_joint_effort_pub_[it.first]   = ros_node.advertise<std_msgs::Float64>(
-                                                "/" + gazebo_robot_name_ + "/" + it.first + "_effort/command", 1);
-    }
-  }
+//   if (gazebo_mode_ == true)
+//   {
+//     for (auto& it : robot_->dxls_)
+//     {
+//       gazebo_joint_position_pub_[it.first] = ros_node.advertise<std_msgs::Float64>(
+//                                                 "/" + gazebo_robot_name_ + "/" + it.first + "_position/command", 1);
+//       gazebo_joint_velocity_pub_[it.first] = ros_node.advertise<std_msgs::Float64>(
+//                                                 "/" + gazebo_robot_name_ + "/" + it.first + "_velocity/command", 1);
+//       gazebo_joint_effort_pub_[it.first]   = ros_node.advertise<std_msgs::Float64>(
+//                                                 "/" + gazebo_robot_name_ + "/" + it.first + "_effort/command", 1);
+//     }
+//   }
 
-  /* service */
-  ros::ServiceServer get_joint_module_server = ros_node.advertiseService("/robotis/get_present_joint_ctrl_modules",
-                                                        &RobotisController::getJointCtrlModuleService, this);
-  ros::ServiceServer set_joint_module_server = ros_node.advertiseService("/robotis/set_present_joint_ctrl_modules",
-                                                        &RobotisController::setJointCtrlModuleService, this);
-  ros::ServiceServer set_module_server = ros_node.advertiseService("/robotis/set_present_ctrl_modules",
-                                                        &RobotisController::setCtrlModuleService, this);
-  ros::ServiceServer load_offset_server = ros_node.advertiseService("/robotis/load_offset",
-                                                        &RobotisController::loadOffsetService, this);
+//   /* service */
+//   ros::ServiceServer get_joint_module_server = ros_node.advertiseService("/robotis/get_present_joint_ctrl_modules",
+//                                                         &RobotisController::getJointCtrlModuleService, this);
+//   ros::ServiceServer set_joint_module_server = ros_node.advertiseService("/robotis/set_present_joint_ctrl_modules",
+//                                                         &RobotisController::setJointCtrlModuleService, this);
+//   ros::ServiceServer set_module_server = ros_node.advertiseService("/robotis/set_present_ctrl_modules",
+//                                                         &RobotisController::setCtrlModuleService, this);
+//   ros::ServiceServer load_offset_server = ros_node.advertiseService("/robotis/load_offset",
+//                                                         &RobotisController::loadOffsetService, this);
 
-  ros::WallDuration duration(robot_->getControlCycle() / 1000.0);
-  while(ros_node.ok())
-    callback_queue.callAvailable(duration);
-}
+//   ros::WallDuration duration(robot_->getControlCycle() / 1000.0);
+//   while(ros_node.ok())
+//     callback_queue.callAvailable(duration);
+// }
 
 void *RobotisController::timerThread(void *param)
 {
@@ -699,7 +699,7 @@ void *RobotisController::timerThread(void *param)
   static struct timespec next_time;
   static struct timespec curr_time;
 
-  ROS_DEBUG("controller::thread_proc started");
+  // ROS_DEBUG("controller::thread_proc started");
 
   clock_gettime(CLOCK_MONOTONIC, &next_time);
 
@@ -739,7 +739,7 @@ void RobotisController::startTimer()
   if (this->gazebo_mode_ == true)
   {
     // create and start the thread
-    gazebo_thread_ = boost::thread(boost::bind(&RobotisController::gazeboTimerThread, this));
+    // gazebo_thread_ = boost::thread(boost::bind(&RobotisController::gazeboTimerThread, this));
   }
   else
   {
@@ -760,21 +760,21 @@ void RobotisController::startTimer()
 
     error = pthread_attr_setschedpolicy(&attr, SCHED_RR);
     if (error != 0)
-      ROS_ERROR("pthread_attr_setschedpolicy error = %d\n", error);
+      std::cerr<<"pthread_attr_setschedpolicy error = "<<error<<std::endl;
     error = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
     if (error != 0)
-      ROS_ERROR("pthread_attr_setinheritsched error = %d\n", error);
+      std::cerr<<"pthread_attr_setinheritsched error = "<<error<<std::endl;
 
     memset(&param, 0, sizeof(param));
     param.sched_priority = 31;    // RT
     error = pthread_attr_setschedparam(&attr, &param);
     if (error != 0)
-      ROS_ERROR("pthread_attr_setschedparam error = %d\n", error);
+      std::cerr<<"pthread_attr_setschedparam error = "<<error<<std::endl;
 
     // create and start the thread
     if ((error = pthread_create(&this->timer_thread_, &attr, this->timerThread, this)) != 0)
     {
-      ROS_ERROR("Creating timer thread failed!!");
+      std::cerr<<"Creating timer thread failed!!"<<std::endl;
       exit(-1);
     }
   }
@@ -852,7 +852,7 @@ void RobotisController::stopTimer()
     else
     {
       // wait until the thread is stopped.
-      gazebo_thread_.join();
+      // gazebo_thread_.join();
     }
 
     this->stop_timer_ = false;
@@ -873,7 +873,7 @@ void RobotisController::loadOffset(const std::string path)
     doc = YAML::LoadFile(path.c_str());
   } catch (const std::exception& e)
   {
-    ROS_WARN("Fail to load offset yaml.");
+    std::cout<<"Fail to load offset yaml."<<std::endl;
     return;
   }
 
@@ -881,7 +881,7 @@ void RobotisController::loadOffset(const std::string path)
   if (offset_node.size() == 0)
     return;
 
-  ROS_INFO("Load offsets...");
+  std::cout<<"Load offsets..."<<std::endl;;
   for (YAML::const_iterator it = offset_node.begin(); it != offset_node.end(); it++)
   {
     std::string joint_name = it->first.as<std::string>();
@@ -919,17 +919,17 @@ void RobotisController::process()
   }
   
 
-  ros::Time start_time;
-  ros::Duration time_duration;
+  // ros::Time start_time;
+  // ros::Duration time_duration;
 
-  if (DEBUG_PRINT)
-    start_time = ros::Time::now();
+  // if (DEBUG_PRINT)
+  //   start_time = ros::Time::now();
 
-  sensor_msgs::JointState goal_state;
-  sensor_msgs::JointState present_state;
+  // sensor_msgs::JointState goal_state;
+  // sensor_msgs::JointState present_state;
 
-  present_state.header.stamp = ros::Time::now();
-  goal_state.header.stamp = present_state.header.stamp;
+  // present_state.header.stamp = ros::Time::now();
+  // goal_state.header.stamp = present_state.header.stamp;
 
   if (controller_mode_ == MotionModuleMode)
   {
@@ -943,7 +943,7 @@ void RobotisController::process()
         {
           int result = it.second->rxPacket();
           if(result != COMM_SUCCESS)
-            ROS_ERROR_STREAM("Bulk Read Fail : " << it.first);
+            std::cerr<<"Bulk Read Fail : " << it.first<<std::endl;
         }
         else
           it.second->rxPacket();
@@ -993,8 +993,8 @@ void RobotisController::process()
             }
 
             // -> update time stamp to Robot->dxls[]->dynamixel_state.update_time_stamp
-            if (updated == true)
-              dxl->dxl_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
+            // if (updated == true)
+            //   dxl->dxl_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
           }
         }
       }
@@ -1026,17 +1026,17 @@ void RobotisController::process()
             }
 
             // -> update time stamp to Robot->dxls[]->dynamixel_state.update_time_stamp
-            if (updated == true)
-              sensor->sensor_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
+            // if (updated == true)
+            //   sensor->sensor_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
           }
         }
       }
 
-      if (DEBUG_PRINT)
-      {
-        time_duration = ros::Time::now() - start_time;
-        fprintf(stderr, "(%2.6f) BulkRead Rx & update state \n", time_duration.nsec * 0.000001);
-      }
+      // if (DEBUG_PRINT)
+      // {
+      //   time_duration = ros::Time::now() - start_time;
+      //   fprintf(stderr, "(%2.6f) BulkRead Rx & update state \n", time_duration.nsec * 0.000001);
+      // }
 
       // SyncWrite
       queue_mutex_.lock();
@@ -1121,60 +1121,60 @@ void RobotisController::process()
       for (auto& it : port_to_bulk_read_)
         it.second->txPacket();
 
-      if (DEBUG_PRINT)
-      {
-        time_duration = ros::Time::now() - start_time;
-        fprintf(stderr, "(%2.6f) SyncWrite & BulkRead Tx \n", time_duration.nsec * 0.000001);
-      }
+      // if (DEBUG_PRINT)
+      // {
+      //   time_duration = ros::Time::now() - start_time;
+      //   fprintf(stderr, "(%2.6f) SyncWrite & BulkRead Tx \n", time_duration.nsec * 0.000001);
+      // }
     }
     else if (gazebo_mode_ == true)
     {
-      std_msgs::Float64 joint_msg;
+      // std_msgs::Float64 joint_msg;
 
-      for (auto& dxl_it : robot_->dxls_)
-      {
-        std::string     joint_name  = dxl_it.first;
-        Dynamixel      *dxl         = dxl_it.second;
-        DynamixelState *dxl_state   = dxl_it.second->dxl_state_;
+      // for (auto& dxl_it : robot_->dxls_)
+      // {
+      //   std::string     joint_name  = dxl_it.first;
+      //   Dynamixel      *dxl         = dxl_it.second;
+      //   DynamixelState *dxl_state   = dxl_it.second->dxl_state_;
         
-        if (dxl->ctrl_module_name_ == "none")
-        {
-          joint_msg.data = dxl_state->goal_position_;
-          gazebo_joint_position_pub_[joint_name].publish(joint_msg);
-        }
-      }
+      //   if (dxl->ctrl_module_name_ == "none")
+      //   {
+      //     joint_msg.data = dxl_state->goal_position_;
+      //     gazebo_joint_position_pub_[joint_name].publish(joint_msg);
+      //   }
+      // }
 
-      for (auto module_it = motion_modules_.begin(); module_it != motion_modules_.end(); module_it++)
-      {
-        if ((*module_it)->getModuleEnable() == false)
-          continue;
+      // for (auto module_it = motion_modules_.begin(); module_it != motion_modules_.end(); module_it++)
+      // {
+      //   if ((*module_it)->getModuleEnable() == false)
+      //     continue;
 
-        for (auto& dxl_it : robot_->dxls_)
-        {
-          std::string     joint_name  = dxl_it.first;
-          Dynamixel      *dxl         = dxl_it.second;
-          DynamixelState *dxl_state   = dxl_it.second->dxl_state_;
+      //   for (auto& dxl_it : robot_->dxls_)
+      //   {
+      //     std::string     joint_name  = dxl_it.first;
+      //     Dynamixel      *dxl         = dxl_it.second;
+      //     DynamixelState *dxl_state   = dxl_it.second->dxl_state_;
 
-          if (dxl->ctrl_module_name_ == (*module_it)->getModuleName())
-          {
-            if ((*module_it)->getControlMode() == PositionControl)
-            {
-              joint_msg.data = dxl_state->goal_position_;
-              gazebo_joint_position_pub_[joint_name].publish(joint_msg);
-            }
-            else if ((*module_it)->getControlMode() == VelocityControl)
-            {
-              joint_msg.data = dxl_state->goal_velocity_;
-              gazebo_joint_velocity_pub_[joint_name].publish(joint_msg);
-            }
-            else if ((*module_it)->getControlMode() == TorqueControl)
-            {
-              joint_msg.data = dxl_state->goal_torque_;
-              gazebo_joint_effort_pub_[joint_name].publish(joint_msg);
-            }
-          }
-        }
-      }
+      //     if (dxl->ctrl_module_name_ == (*module_it)->getModuleName())
+      //     {
+      //       if ((*module_it)->getControlMode() == PositionControl)
+      //       {
+      //         joint_msg.data = dxl_state->goal_position_;
+      //         gazebo_joint_position_pub_[joint_name].publish(joint_msg);
+      //       }
+      //       else if ((*module_it)->getControlMode() == VelocityControl)
+      //       {
+      //         joint_msg.data = dxl_state->goal_velocity_;
+      //         gazebo_joint_velocity_pub_[joint_name].publish(joint_msg);
+      //       }
+      //       else if ((*module_it)->getControlMode() == TorqueControl)
+      //       {
+      //         joint_msg.data = dxl_state->goal_torque_;
+      //         gazebo_joint_effort_pub_[joint_name].publish(joint_msg);
+      //       }
+      //     }
+      //   }
+      // }
     }
   }
   else if (controller_mode_ == DirectControlMode)
@@ -1230,7 +1230,7 @@ void RobotisController::process()
             }
 
             // -> update time stamp to Robot->dxls[]->dynamixel_state.update_time_stamp
-            dxl->dxl_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
+            // dxl->dxl_state_->update_time_stamp_ = TimeStamp(present_state.header.stamp.sec, present_state.header.stamp.nsec);
           }
         }
       }
@@ -1274,11 +1274,11 @@ void RobotisController::process()
     }
   }
 
-  if (DEBUG_PRINT)
-  {
-    time_duration = ros::Time::now() - start_time;
-    fprintf(stderr, "(%2.6f) SensorModule Process() & save result \n", time_duration.nsec * 0.000001);
-  }
+  // if (DEBUG_PRINT)
+  // {
+  //   time_duration = ros::Time::now() - start_time;
+  //   fprintf(stderr, "(%2.6f) SensorModule Process() & save result \n", time_duration.nsec * 0.000001);
+  // }
 
   if (controller_mode_ == MotionModuleMode)
   {
@@ -1309,7 +1309,7 @@ void RobotisController::process()
 
             if (result_state == NULL)
             {
-              ROS_ERROR("[%s] %s ", (*module_it)->getModuleName().c_str(), joint_name.c_str());
+              std::cerr<<"["<<(*module_it)->getModuleName().c_str()<<"] "<<joint_name.c_str()<<std::endl;
               continue;
             }
 
@@ -1487,11 +1487,11 @@ void RobotisController::process()
       queue_mutex_.unlock();
     }
 
-    if (DEBUG_PRINT)
-    {
-      time_duration = ros::Time::now() - start_time;
-      fprintf(stderr, "(%2.6f) MotionModule Process() & save result \n", time_duration.nsec * 0.000001);
-    }
+    // if (DEBUG_PRINT)
+    // {
+    //   time_duration = ros::Time::now() - start_time;
+    //   fprintf(stderr, "(%2.6f) MotionModule Process() & save result \n", time_duration.nsec * 0.000001);
+    // }
   }
 
   // publish present & goal position
@@ -1500,26 +1500,26 @@ void RobotisController::process()
     std::string joint_name  = dxl_it.first;
     Dynamixel  *dxl         = dxl_it.second;
 
-    present_state.name.push_back(joint_name);
-    present_state.position.push_back(dxl->dxl_state_->present_position_);
-    present_state.velocity.push_back(dxl->dxl_state_->present_velocity_);
-    present_state.effort.push_back(dxl->dxl_state_->present_torque_);
+    // present_state.name.push_back(joint_name);
+    // present_state.position.push_back(dxl->dxl_state_->present_position_);
+    // present_state.velocity.push_back(dxl->dxl_state_->present_velocity_);
+    // present_state.effort.push_back(dxl->dxl_state_->present_torque_);
 
-    goal_state.name.push_back(joint_name);
-    goal_state.position.push_back(dxl->dxl_state_->goal_position_);
-    goal_state.velocity.push_back(dxl->dxl_state_->goal_velocity_);
-    goal_state.effort.push_back(dxl->dxl_state_->goal_torque_);
+    // goal_state.name.push_back(joint_name);
+    // goal_state.position.push_back(dxl->dxl_state_->goal_position_);
+    // goal_state.velocity.push_back(dxl->dxl_state_->goal_velocity_);
+    // goal_state.effort.push_back(dxl->dxl_state_->goal_torque_);
   }
 
   // -> publish present joint_states & goal joint states topic
-  present_joint_state_pub_.publish(present_state);
-  goal_joint_state_pub_.publish(goal_state);
+  // present_joint_state_pub_.publish(present_state);
+  // goal_joint_state_pub_.publish(goal_state);
 
-  if (DEBUG_PRINT)
-  {
-    time_duration = ros::Time::now() - start_time;
-    fprintf(stderr, "(%2.6f) Process() DONE \n", time_duration.nsec * 0.000001);
-  }
+  // if (DEBUG_PRINT)
+  // {
+  //   time_duration = ros::Time::now() - start_time;
+  //   fprintf(stderr, "(%2.6f) Process() DONE \n", time_duration.nsec * 0.000001);
+  // }
 
   is_process_running = false;
 }
@@ -1531,7 +1531,7 @@ void RobotisController::addMotionModule(MotionModule *module)
   {
     if ((*m_it)->getModuleName() == module->getModuleName())
     {
-      ROS_ERROR("Motion Module Name [%s] already exist !!", module->getModuleName().c_str());
+      std::cerr<<"Motion Module Name ["<<module->getModuleName()<<"] already exist !!"<<std::endl;
       return;
     }
   }
@@ -1553,7 +1553,7 @@ void RobotisController::addSensorModule(SensorModule *module)
   {
     if ((*m_it)->getModuleName() == module->getModuleName())
     {
-      ROS_ERROR("Sensor Module Name [%s] already exist !!", module->getModuleName().c_str());
+      std::cerr<<"Sensor Module Name ["<<module->getModuleName()<<"] already exist !!"<<std::endl;
       return;
     }
   }
@@ -1568,216 +1568,216 @@ void RobotisController::removeSensorModule(SensorModule *module)
   sensor_modules_.remove(module);
 }
 
-void RobotisController::writeControlTableCallback(const robotis_controller_msgs::WriteControlTable::ConstPtr &msg)
-{
-  Device *device = NULL;
+// void RobotisController::writeControlTableCallback(const robotis_controller_msgs::WriteControlTable::ConstPtr &msg)
+// {
+//   Device *device = NULL;
 
-  if (DEBUG_PRINT)
-    fprintf(stderr, "[WriteControlTable] led control msg received\n");
+//   if (DEBUG_PRINT)
+//     fprintf(stderr, "[WriteControlTable] led control msg received\n");
 
-  auto dev_it1 = robot_->dxls_.find(msg->joint_name);
-  if(dev_it1 != robot_->dxls_.end())
-  {
-    device = dev_it1->second;
-  }
-  else
-  {
-    auto dev_it2 = robot_->sensors_.find(msg->joint_name);
-    if(dev_it2 != robot_->sensors_.end())
-    {
-      device = dev_it2->second;
-    }
-    else
-    {
-      ROS_WARN("[WriteControlTable] Unknown device : %s", msg->joint_name.c_str());
-      return;
-    }
-  }
+//   auto dev_it1 = robot_->dxls_.find(msg->joint_name);
+//   if(dev_it1 != robot_->dxls_.end())
+//   {
+//     device = dev_it1->second;
+//   }
+//   else
+//   {
+//     auto dev_it2 = robot_->sensors_.find(msg->joint_name);
+//     if(dev_it2 != robot_->sensors_.end())
+//     {
+//       device = dev_it2->second;
+//     }
+//     else
+//     {
+//       std::cout<<"[WriteControlTable] Unknown device : "<<msg->joint_name.c_str()<<std::endl;
+//       return;
+//     }
+//   }
 
-  ControlTableItem *item = NULL;
-  auto item_it = device->ctrl_table_.find(msg->start_item_name);
-  if(item_it != device->ctrl_table_.end())
-  {
-    item = item_it->second;
-  }
-  else
-  {
-    ROS_WARN("[WriteControlTable] Unknown item : %s", msg->start_item_name.c_str());
-    return;
-  }
+//   ControlTableItem *item = NULL;
+//   auto item_it = device->ctrl_table_.find(msg->start_item_name);
+//   if(item_it != device->ctrl_table_.end())
+//   {
+//     item = item_it->second;
+//   }
+//   else
+//   {
+//     std::cout<<"[WriteControlTable] Unknown item : "<<msg->start_item_name.c_str()<<std::endl;
+//     return;
+//   }
 
-  dynamixel::PortHandler   *port           = robot_->ports_[device->port_name_];
-  dynamixel::PacketHandler *packet_handler = dynamixel::PacketHandler::getPacketHandler(device->protocol_version_);
+//   dynamixel::PortHandler   *port           = robot_->ports_[device->port_name_];
+//   dynamixel::PacketHandler *packet_handler = dynamixel::PacketHandler::getPacketHandler(device->protocol_version_);
 
-  if (item->access_type_ == Read)
-    return;
+//   if (item->access_type_ == Read)
+//     return;
 
-  queue_mutex_.lock();
+//   queue_mutex_.lock();
 
-  direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, msg->data_length));
-  direct_sync_write_[direct_sync_write_.size() - 1]->addParam(device->id_, (uint8_t *)(msg->data.data()));
+//   direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, msg->data_length));
+//   direct_sync_write_[direct_sync_write_.size() - 1]->addParam(device->id_, (uint8_t *)(msg->data.data()));
   
-//  fprintf(stderr, "[WriteControlTable] %s -> %s : ", msg->joint_name.c_str(), msg->start_item_name.c_str());
-//  for (auto &dt : msg->data)
-//	  fprintf(stderr, "%02X ", dt);
-//  fprintf(stderr, "\n");
+// //  fprintf(stderr, "[WriteControlTable] %s -> %s : ", msg->joint_name.c_str(), msg->start_item_name.c_str());
+// //  for (auto &dt : msg->data)
+// //	  fprintf(stderr, "%02X ", dt);
+// //  fprintf(stderr, "\n");
 
-  queue_mutex_.unlock();
+//   queue_mutex_.unlock();
 
-}
+// }
 
-void RobotisController::syncWriteItemCallback(const robotis_controller_msgs::SyncWriteItem::ConstPtr &msg)
-{
-  for (int i = 0; i < msg->joint_name.size(); i++)
-  {
-    Device           *device;
+// void RobotisController::syncWriteItemCallback(const robotis_controller_msgs::SyncWriteItem::ConstPtr &msg)
+// {
+//   for (int i = 0; i < msg->joint_name.size(); i++)
+//   {
+//     Device           *device;
 
-    auto d_it1 = robot_->dxls_.find(msg->joint_name[i]);
-    if (d_it1 != robot_->dxls_.end())
-    {
-      device = d_it1->second;
-    }
-    else
-    {
-      auto d_it2 = robot_->sensors_.find(msg->joint_name[i]);
-      if (d_it2 != robot_->sensors_.end())
-      {
-        device = d_it2->second;
-      }
-      else
-      {
-        ROS_WARN("[SyncWriteItem] Unknown device : %s", msg->joint_name[i].c_str());
-        continue;
-      }
-    }
+//     auto d_it1 = robot_->dxls_.find(msg->joint_name[i]);
+//     if (d_it1 != robot_->dxls_.end())
+//     {
+//       device = d_it1->second;
+//     }
+//     else
+//     {
+//       auto d_it2 = robot_->sensors_.find(msg->joint_name[i]);
+//       if (d_it2 != robot_->sensors_.end())
+//       {
+//         device = d_it2->second;
+//       }
+//       else
+//       {
+//         std::cout<<"[SyncWriteItem] Unknown device : "<<msg->joint_name[i].c_str()<<std::endl;
+//         continue;
+//       }
+//     }
 
-//    ControlTableItem *item  = device->ctrl_table_[msg->item_name];
-    ControlTableItem *item  = NULL;
-    auto item_it = device->ctrl_table_.find(msg->item_name);
-    if(item_it != device->ctrl_table_.end())
-    {
-      item = item_it->second;
-    }
-    else
-    {
-      ROS_WARN("SyncWriteItem] Unknown item : %s", msg->item_name.c_str());
-      continue;
-    }
+// //    ControlTableItem *item  = device->ctrl_table_[msg->item_name];
+//     ControlTableItem *item  = NULL;
+//     auto item_it = device->ctrl_table_.find(msg->item_name);
+//     if(item_it != device->ctrl_table_.end())
+//     {
+//       item = item_it->second;
+//     }
+//     else
+//     {
+//       std::cout<<"SyncWriteItem] Unknown item : "<<msg->item_name.c_str()<<std::endl;
+//       continue;
+//     }
 
-    dynamixel::PortHandler   *port           = robot_->ports_[device->port_name_];
-    dynamixel::PacketHandler *packet_handler = dynamixel::PacketHandler::getPacketHandler(device->protocol_version_);
+//     dynamixel::PortHandler   *port           = robot_->ports_[device->port_name_];
+//     dynamixel::PacketHandler *packet_handler = dynamixel::PacketHandler::getPacketHandler(device->protocol_version_);
 
-    if (item->access_type_ == Read)
-      continue;
+//     if (item->access_type_ == Read)
+//       continue;
 
-    queue_mutex_.lock();
+//     queue_mutex_.lock();
 
-    int idx = 0;
-    if (direct_sync_write_.size() == 0)
-    {
-      direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, item->data_length_));
-      idx = 0;
-    }
-    else
-    {
-      for (idx = 0; idx < direct_sync_write_.size(); idx++)
-      {
-        if (direct_sync_write_[idx]->getPortHandler() == port && direct_sync_write_[idx]->getPacketHandler() == packet_handler)
-          break;
-      }
+//     int idx = 0;
+//     if (direct_sync_write_.size() == 0)
+//     {
+//       direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, item->data_length_));
+//       idx = 0;
+//     }
+//     else
+//     {
+//       for (idx = 0; idx < direct_sync_write_.size(); idx++)
+//       {
+//         if (direct_sync_write_[idx]->getPortHandler() == port && direct_sync_write_[idx]->getPacketHandler() == packet_handler)
+//           break;
+//       }
 
-      if (idx == direct_sync_write_.size())
-        direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, item->data_length_));
-    }
+//       if (idx == direct_sync_write_.size())
+//         direct_sync_write_.push_back(new dynamixel::GroupSyncWrite(port, packet_handler, item->address_, item->data_length_));
+//     }
 
-    uint8_t *data = new uint8_t[item->data_length_];
-    if (item->data_length_ == 1)
-      data[0] = (uint8_t) msg->value[i];
-    else if (item->data_length_ == 2)
-    {
-      data[0] = DXL_LOBYTE((uint16_t )msg->value[i]);
-      data[1] = DXL_HIBYTE((uint16_t )msg->value[i]);
-    }
-    else if (item->data_length_ == 4)
-    {
-      data[0] = DXL_LOBYTE(DXL_LOWORD((uint32_t)msg->value[i]));
-      data[1] = DXL_HIBYTE(DXL_LOWORD((uint32_t)msg->value[i]));
-      data[2] = DXL_LOBYTE(DXL_HIWORD((uint32_t)msg->value[i]));
-      data[3] = DXL_HIBYTE(DXL_HIWORD((uint32_t)msg->value[i]));
-    }
-    direct_sync_write_[idx]->addParam(device->id_, data);
-    delete[] data;
+//     uint8_t *data = new uint8_t[item->data_length_];
+//     if (item->data_length_ == 1)
+//       data[0] = (uint8_t) msg->value[i];
+//     else if (item->data_length_ == 2)
+//     {
+//       data[0] = DXL_LOBYTE((uint16_t )msg->value[i]);
+//       data[1] = DXL_HIBYTE((uint16_t )msg->value[i]);
+//     }
+//     else if (item->data_length_ == 4)
+//     {
+//       data[0] = DXL_LOBYTE(DXL_LOWORD((uint32_t)msg->value[i]));
+//       data[1] = DXL_HIBYTE(DXL_LOWORD((uint32_t)msg->value[i]));
+//       data[2] = DXL_LOBYTE(DXL_HIWORD((uint32_t)msg->value[i]));
+//       data[3] = DXL_HIBYTE(DXL_HIWORD((uint32_t)msg->value[i]));
+//     }
+//     direct_sync_write_[idx]->addParam(device->id_, data);
+//     delete[] data;
 
-    queue_mutex_.unlock();
-  }
-}
+//     queue_mutex_.unlock();
+//   }
+// }
 
-void RobotisController::setControllerModeCallback(const std_msgs::String::ConstPtr &msg)
-{
-  if (msg->data == "DirectControlMode")
-  {
-    for (auto& it : port_to_bulk_read_)
-    {
-      robot_->ports_[it.first]->setPacketTimeout(0.0);
-      it.second->rxPacket();
-    }
-    controller_mode_ = DirectControlMode;
-  }
-  else if (msg->data == "MotionModuleMode")
-  {
-    for (auto& it : port_to_bulk_read_)
-    {
-      it.second->txPacket();
-    }
-    controller_mode_ = MotionModuleMode;
-  }
-}
+// void RobotisController::setControllerModeCallback(const std_msgs::String::ConstPtr &msg)
+// {
+//   if (msg->data == "DirectControlMode")
+//   {
+//     for (auto& it : port_to_bulk_read_)
+//     {
+//       robot_->ports_[it.first]->setPacketTimeout(0.0);
+//       it.second->rxPacket();
+//     }
+//     controller_mode_ = DirectControlMode;
+//   }
+//   else if (msg->data == "MotionModuleMode")
+//   {
+//     for (auto& it : port_to_bulk_read_)
+//     {
+//       it.second->txPacket();
+//     }
+//     controller_mode_ = MotionModuleMode;
+//   }
+// }
 
-void RobotisController::setJointStatesCallback(const sensor_msgs::JointState::ConstPtr &msg)
-{
-  queue_mutex_.lock();
+// void RobotisController::setJointStatesCallback(const sensor_msgs::JointState::ConstPtr &msg)
+// {
+//   queue_mutex_.lock();
 
-  for (int i = 0; i < msg->name.size(); i++)
-  {
-    Dynamixel *dxl = robot_->dxls_[msg->name[i]];
-    if (dxl == NULL)
-      continue;
+//   for (int i = 0; i < msg->name.size(); i++)
+//   {
+//     Dynamixel *dxl = robot_->dxls_[msg->name[i]];
+//     if (dxl == NULL)
+//       continue;
 
-    if ((controller_mode_ == DirectControlMode) || 
-        (controller_mode_ == MotionModuleMode && dxl->ctrl_module_name_ == "none"))
-    {
-      dxl->dxl_state_->goal_position_ = (double) msg->position[i];
+//     if ((controller_mode_ == DirectControlMode) || 
+//         (controller_mode_ == MotionModuleMode && dxl->ctrl_module_name_ == "none"))
+//     {
+//       dxl->dxl_state_->goal_position_ = (double) msg->position[i];
       
-      if (gazebo_mode_ == false)
-      {
-        // add offset
-        uint32_t pos_data;
-        pos_data = dxl->convertRadian2Value(dxl->dxl_state_->goal_position_ + dxl->dxl_state_->position_offset_ * offset_ratio_);
+//       if (gazebo_mode_ == false)
+//       {
+//         // add offset
+//         uint32_t pos_data;
+//         pos_data = dxl->convertRadian2Value(dxl->dxl_state_->goal_position_ + dxl->dxl_state_->position_offset_ * offset_ratio_);
 
-        uint8_t sync_write_data[4] = { 0 };
-        sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(pos_data));
-        sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(pos_data));
-        sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(pos_data));
-        sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(pos_data));
+//         uint8_t sync_write_data[4] = { 0 };
+//         sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(pos_data));
+//         sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(pos_data));
+//         sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(pos_data));
+//         sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(pos_data));
         
-        if (port_to_sync_write_position_[dxl->port_name_] != NULL)
-          port_to_sync_write_position_[dxl->port_name_]->changeParam(dxl->id_, sync_write_data);
-      }
-    }
-  }
+//         if (port_to_sync_write_position_[dxl->port_name_] != NULL)
+//           port_to_sync_write_position_[dxl->port_name_]->changeParam(dxl->id_, sync_write_data);
+//       }
+//     }
+//   }
 
-  queue_mutex_.unlock();
-}
+//   queue_mutex_.unlock();
+// }
 
-void RobotisController::setCtrlModuleCallback(const std_msgs::String::ConstPtr &msg)
-{
-  if(set_module_thread_.joinable())
-    set_module_thread_.join();
+// void RobotisController::setCtrlModuleCallback(const std_msgs::String::ConstPtr &msg)
+// {
+//   if(set_module_thread_.joinable())
+//     set_module_thread_.join();
 
-  std::string _module_name_to_set = msg->data;
+//   std::string _module_name_to_set = msg->data;
 
-  set_module_thread_ = boost::thread(boost::bind(&RobotisController::setCtrlModuleThread, this, _module_name_to_set));
-}
+//   set_module_thread_ = boost::thread(boost::bind(&RobotisController::setCtrlModuleThread, this, _module_name_to_set));
+// }
 
 void RobotisController::setCtrlModule(std::string module_name)
 {
@@ -1786,277 +1786,277 @@ void RobotisController::setCtrlModule(std::string module_name)
 
   set_module_thread_ = boost::thread(boost::bind(&RobotisController::setCtrlModuleThread, this, module_name));
 }
-void RobotisController::setJointCtrlModuleCallback(const robotis_controller_msgs::JointCtrlModule::ConstPtr &msg)
-{
-  if (msg->joint_name.size() != msg->module_name.size())
-    return;
+// void RobotisController::setJointCtrlModuleCallback(const robotis_controller_msgs::JointCtrlModule::ConstPtr &msg)
+// {
+//   if (msg->joint_name.size() != msg->module_name.size())
+//     return;
 
-  if(set_module_thread_.joinable())
-    set_module_thread_.join();
+//   if(set_module_thread_.joinable())
+//     set_module_thread_.join();
 
-  set_module_thread_ = boost::thread(boost::bind(&RobotisController::setJointCtrlModuleThread, this, msg));
-}
+//   set_module_thread_ = boost::thread(boost::bind(&RobotisController::setJointCtrlModuleThread, this, msg));
+// }
 
-void RobotisController::enableOffsetCallback(const std_msgs::Bool::ConstPtr &msg)
-{
-  is_offset_enabled_ = (bool)msg->data;
-  if(is_offset_enabled_)
-    offset_ratio_ = 0.0;
-  else
-    offset_ratio_ = 1.0;  
-}
+// void RobotisController::enableOffsetCallback(const std_msgs::Bool::ConstPtr &msg)
+// {
+//   is_offset_enabled_ = (bool)msg->data;
+//   if(is_offset_enabled_)
+//     offset_ratio_ = 0.0;
+//   else
+//     offset_ratio_ = 1.0;  
+// }
 
-bool RobotisController::getJointCtrlModuleService(robotis_controller_msgs::GetJointModule::Request &req,
-    robotis_controller_msgs::GetJointModule::Response &res)
-{
-  for (unsigned int idx = 0; idx < req.joint_name.size(); idx++)
-  {
-    auto d_it = robot_->dxls_.find((std::string) (req.joint_name[idx]));
-    if (d_it != robot_->dxls_.end())
-    {
-      res.joint_name.push_back(req.joint_name[idx]);
-      res.module_name.push_back(d_it->second->ctrl_module_name_);
-    }
-  }
+// bool RobotisController::getJointCtrlModuleService(robotis_controller_msgs::GetJointModule::Request &req,
+//     robotis_controller_msgs::GetJointModule::Response &res)
+// {
+//   for (unsigned int idx = 0; idx < req.joint_name.size(); idx++)
+//   {
+//     auto d_it = robot_->dxls_.find((std::string) (req.joint_name[idx]));
+//     if (d_it != robot_->dxls_.end())
+//     {
+//       res.joint_name.push_back(req.joint_name[idx]);
+//       res.module_name.push_back(d_it->second->ctrl_module_name_);
+//     }
+//   }
 
-  if (res.joint_name.size() == 0)
-    return false;
+//   if (res.joint_name.size() == 0)
+//     return false;
 
-  return true;
-}
+//   return true;
+// }
 
-bool RobotisController::setJointCtrlModuleService(robotis_controller_msgs::SetJointModule::Request &req, robotis_controller_msgs::SetJointModule::Response &res)
-{
-  if(set_module_thread_.joinable())
-    set_module_thread_.join();
+// bool RobotisController::setJointCtrlModuleService(robotis_controller_msgs::SetJointModule::Request &req, robotis_controller_msgs::SetJointModule::Response &res)
+// {
+//   if(set_module_thread_.joinable())
+//     set_module_thread_.join();
 
-  robotis_controller_msgs::JointCtrlModule modules;
-  modules.joint_name = req.joint_name;
-  modules.module_name = req.module_name;
+//   robotis_controller_msgs::JointCtrlModule modules;
+//   modules.joint_name = req.joint_name;
+//   modules.module_name = req.module_name;
 
-  robotis_controller_msgs::JointCtrlModule::ConstPtr msg_ptr(new robotis_controller_msgs::JointCtrlModule(modules));
+//   robotis_controller_msgs::JointCtrlModule::ConstPtr msg_ptr(new robotis_controller_msgs::JointCtrlModule(modules));
 
-  if (modules.joint_name.size() != modules.module_name.size())
-    return false;
+//   if (modules.joint_name.size() != modules.module_name.size())
+//     return false;
 
-  set_module_thread_ = boost::thread(boost::bind(&RobotisController::setJointCtrlModuleThread, this, msg_ptr));
+//   set_module_thread_ = boost::thread(boost::bind(&RobotisController::setJointCtrlModuleThread, this, msg_ptr));
 
-  set_module_thread_.join();
+//   set_module_thread_.join();
 
-  return true;
-}
+//   return true;
+// }
 
-bool RobotisController::setCtrlModuleService(robotis_controller_msgs::SetModule::Request &req, robotis_controller_msgs::SetModule::Response &res)
-{
-  if(set_module_thread_.joinable())
-    set_module_thread_.join();
+// bool RobotisController::setCtrlModuleService(robotis_controller_msgs::SetModule::Request &req, robotis_controller_msgs::SetModule::Response &res)
+// {
+//   if(set_module_thread_.joinable())
+//     set_module_thread_.join();
 
-  std::string _module_name_to_set = req.module_name;
+//   std::string _module_name_to_set = req.module_name;
 
-  set_module_thread_ = boost::thread(boost::bind(&RobotisController::setCtrlModuleThread, this, _module_name_to_set));
+//   set_module_thread_ = boost::thread(boost::bind(&RobotisController::setCtrlModuleThread, this, _module_name_to_set));
 
-  set_module_thread_.join();
+//   set_module_thread_.join();
 
-  res.result = true;
-  return true;
-}
+//   res.result = true;
+//   return true;
+// }
 
-bool RobotisController::loadOffsetService(robotis_controller_msgs::LoadOffset::Request &req, robotis_controller_msgs::LoadOffset::Response &res)
-{
-  loadOffset((std::string)req.file_path);
-  res.result = true;
-  return true;
-}
+// bool RobotisController::loadOffsetService(robotis_controller_msgs::LoadOffset::Request &req, robotis_controller_msgs::LoadOffset::Response &res)
+// {
+//   loadOffset((std::string)req.file_path);
+//   res.result = true;
+//   return true;
+// }
 
-void RobotisController::setJointCtrlModuleThread(const robotis_controller_msgs::JointCtrlModule::ConstPtr &msg)
-{
-  // stop module list
-  std::list<MotionModule *> _stop_modules;
-  std::list<MotionModule *> _enable_modules;
+// void RobotisController::setJointCtrlModuleThread(const robotis_controller_msgs::JointCtrlModule::ConstPtr &msg)
+// {
+//   // stop module list
+//   std::list<MotionModule *> _stop_modules;
+//   std::list<MotionModule *> _enable_modules;
 
-  for(unsigned int idx = 0; idx < msg->joint_name.size(); idx++)
-  {
-    Dynamixel *_dxl = NULL;
-    std::map<std::string, Dynamixel*>::iterator _dxl_it = robot_->dxls_.find((std::string)(msg->joint_name[idx]));
-    if(_dxl_it != robot_->dxls_.end())
-      _dxl = _dxl_it->second;
-    else
-      continue;
+//   for(unsigned int idx = 0; idx < msg->joint_name.size(); idx++)
+//   {
+//     Dynamixel *_dxl = NULL;
+//     std::map<std::string, Dynamixel*>::iterator _dxl_it = robot_->dxls_.find((std::string)(msg->joint_name[idx]));
+//     if(_dxl_it != robot_->dxls_.end())
+//       _dxl = _dxl_it->second;
+//     else
+//       continue;
 
-    // enqueue
-    if(_dxl->ctrl_module_name_ != msg->module_name[idx])
-    {
-      for(std::list<MotionModule *>::iterator _stop_m_it = motion_modules_.begin(); _stop_m_it != motion_modules_.end(); _stop_m_it++)
-      {
-        if((*_stop_m_it)->getModuleName() == _dxl->ctrl_module_name_ && (*_stop_m_it)->getModuleEnable() == true)
-          _stop_modules.push_back(*_stop_m_it);
-      }
-    }
-  }
+//     // enqueue
+//     if(_dxl->ctrl_module_name_ != msg->module_name[idx])
+//     {
+//       for(std::list<MotionModule *>::iterator _stop_m_it = motion_modules_.begin(); _stop_m_it != motion_modules_.end(); _stop_m_it++)
+//       {
+//         if((*_stop_m_it)->getModuleName() == _dxl->ctrl_module_name_ && (*_stop_m_it)->getModuleEnable() == true)
+//           _stop_modules.push_back(*_stop_m_it);
+//       }
+//     }
+//   }
 
-  // stop the module
-  _stop_modules.unique();
-  for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
-  {
-    (*_stop_m_it)->stop();
-  }
+//   // stop the module
+//   _stop_modules.unique();
+//   for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
+//   {
+//     (*_stop_m_it)->stop();
+//   }
 
-  // wait to stop
-  for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
-  {
-    while((*_stop_m_it)->isRunning())
-      usleep(robot_->getControlCycle() * 1000);
-  }
+//   // wait to stop
+//   for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
+//   {
+//     while((*_stop_m_it)->isRunning())
+//       usleep(robot_->getControlCycle() * 1000);
+//   }
 
-  // disable module(s)
-  for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
-  {
-    (*_stop_m_it)->setModuleEnable(false);
-  }
+//   // disable module(s)
+//   for(std::list<MotionModule *>::iterator _stop_m_it = _stop_modules.begin(); _stop_m_it != _stop_modules.end(); _stop_m_it++)
+//   {
+//     (*_stop_m_it)->setModuleEnable(false);
+//   }
 
-  // set ctrl module
-  queue_mutex_.lock();
+//   // set ctrl module
+//   queue_mutex_.lock();
 
-  for(unsigned int idx = 0; idx < msg->joint_name.size(); idx++)
-  {
-    std::string ctrl_module = msg->module_name[idx];
-    std::string joint_name = msg->joint_name[idx];
+//   for(unsigned int idx = 0; idx < msg->joint_name.size(); idx++)
+//   {
+//     std::string ctrl_module = msg->module_name[idx];
+//     std::string joint_name = msg->joint_name[idx];
 
-    Dynamixel *_dxl = NULL;
-    std::map<std::string, Dynamixel*>::iterator _dxl_it = robot_->dxls_.find(joint_name);
-    if(_dxl_it != robot_->dxls_.end())
-      _dxl = _dxl_it->second;
-    else
-      continue;
+//     Dynamixel *_dxl = NULL;
+//     std::map<std::string, Dynamixel*>::iterator _dxl_it = robot_->dxls_.find(joint_name);
+//     if(_dxl_it != robot_->dxls_.end())
+//       _dxl = _dxl_it->second;
+//     else
+//       continue;
 
-    // none
-    if(ctrl_module == "" || ctrl_module == "none")
-    {
-      _dxl->ctrl_module_name_ = "none";
+//     // none
+//     if(ctrl_module == "" || ctrl_module == "none")
+//     {
+//       _dxl->ctrl_module_name_ = "none";
 
-      if(gazebo_mode_ == true)
-        continue;
+//       if(gazebo_mode_ == true)
+//         continue;
 
-      uint32_t _pos_data;
-      _pos_data = _dxl->convertRadian2Value(_dxl->dxl_state_->goal_position_ + _dxl->dxl_state_->position_offset_ * offset_ratio_);
+//       uint32_t _pos_data;
+//       _pos_data = _dxl->convertRadian2Value(_dxl->dxl_state_->goal_position_ + _dxl->dxl_state_->position_offset_ * offset_ratio_);
 
-      uint8_t _sync_write_data[4];
-      _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_pos_data));
-      _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_pos_data));
-      _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_pos_data));
-      _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_pos_data));
+//       uint8_t _sync_write_data[4];
+//       _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_pos_data));
+//       _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_pos_data));
+//       _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_pos_data));
+//       _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_pos_data));
 
-      if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
-        port_to_sync_write_position_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
+//       if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
+//         port_to_sync_write_position_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
 
-      if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
-        port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
-      if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
-        port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
-    }
-    else
-    {
-      // check whether the module exist
-      for(std::list<MotionModule *>::iterator _m_it = motion_modules_.begin(); _m_it != motion_modules_.end(); _m_it++)
-      {
-        // if it exist
-        if((*_m_it)->getModuleName() == ctrl_module)
-        {
-          std::map<std::string, DynamixelState*>::iterator _result_it = (*_m_it)->result_.find(joint_name);
-          if(_result_it == (*_m_it)->result_.end())
-            break;
+//       if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
+//         port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
+//       if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
+//         port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
+//     }
+//     else
+//     {
+//       // check whether the module exist
+//       for(std::list<MotionModule *>::iterator _m_it = motion_modules_.begin(); _m_it != motion_modules_.end(); _m_it++)
+//       {
+//         // if it exist
+//         if((*_m_it)->getModuleName() == ctrl_module)
+//         {
+//           std::map<std::string, DynamixelState*>::iterator _result_it = (*_m_it)->result_.find(joint_name);
+//           if(_result_it == (*_m_it)->result_.end())
+//             break;
 
-          _dxl->ctrl_module_name_ = ctrl_module;
+//           _dxl->ctrl_module_name_ = ctrl_module;
 
-          // enqueue enable module list
-          _enable_modules.push_back(*_m_it);
-          ControlMode _mode = (*_m_it)->getControlMode();
+//           // enqueue enable module list
+//           _enable_modules.push_back(*_m_it);
+//           ControlMode _mode = (*_m_it)->getControlMode();
 
-          if(gazebo_mode_ == true)
-            break;
+//           if(gazebo_mode_ == true)
+//             break;
 
-          if(_mode == PositionControl)
-          {
-            uint32_t _pos_data;
-            _pos_data = _dxl->convertRadian2Value(_dxl->dxl_state_->goal_position_ + _dxl->dxl_state_->position_offset_ * offset_ratio_);
+//           if(_mode == PositionControl)
+//           {
+//             uint32_t _pos_data;
+//             _pos_data = _dxl->convertRadian2Value(_dxl->dxl_state_->goal_position_ + _dxl->dxl_state_->position_offset_ * offset_ratio_);
 
-            uint8_t _sync_write_data[4];
-            _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_pos_data));
-            _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_pos_data));
-            _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_pos_data));
-            _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_pos_data));
+//             uint8_t _sync_write_data[4];
+//             _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_pos_data));
+//             _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_pos_data));
+//             _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_pos_data));
+//             _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_pos_data));
 
-            if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
-              port_to_sync_write_position_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
+//             if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_position_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
 
-            if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
-              port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
-            if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
-              port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
-          }
-          else if(_mode == VelocityControl)
-          {
-            uint32_t _vel_data = _dxl->convertVelocity2Value(_dxl->dxl_state_->goal_velocity_);
-            uint8_t _sync_write_data[4];
-            _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_vel_data));
-            _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_vel_data));
-            _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_vel_data));
-            _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_vel_data));
+//             if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
+//             if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
+//           }
+//           else if(_mode == VelocityControl)
+//           {
+//             uint32_t _vel_data = _dxl->convertVelocity2Value(_dxl->dxl_state_->goal_velocity_);
+//             uint8_t _sync_write_data[4];
+//             _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_vel_data));
+//             _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_vel_data));
+//             _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_vel_data));
+//             _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_vel_data));
 
-            if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
-              port_to_sync_write_velocity_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
+//             if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_velocity_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
 
-            if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
-              port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
-            if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
-              port_to_sync_write_position_[_dxl->port_name_]->removeParam(_dxl->id_);
-          }
-          else if(_mode == TorqueControl)
-          {
-            uint32_t _curr_data = _dxl->convertTorque2Value(_dxl->dxl_state_->goal_torque_);
-            uint8_t _sync_write_data[4];
-            _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_curr_data));
-            _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_curr_data));
-            _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_curr_data));
-            _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_curr_data));
+//             if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_current_[_dxl->port_name_]->removeParam(_dxl->id_);
+//             if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_position_[_dxl->port_name_]->removeParam(_dxl->id_);
+//           }
+//           else if(_mode == TorqueControl)
+//           {
+//             uint32_t _curr_data = _dxl->convertTorque2Value(_dxl->dxl_state_->goal_torque_);
+//             uint8_t _sync_write_data[4];
+//             _sync_write_data[0] = DXL_LOBYTE(DXL_LOWORD(_curr_data));
+//             _sync_write_data[1] = DXL_HIBYTE(DXL_LOWORD(_curr_data));
+//             _sync_write_data[2] = DXL_LOBYTE(DXL_HIWORD(_curr_data));
+//             _sync_write_data[3] = DXL_HIBYTE(DXL_HIWORD(_curr_data));
 
-            if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
-              port_to_sync_write_current_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
+//             if(port_to_sync_write_current_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_current_[_dxl->port_name_]->addParam(_dxl->id_, _sync_write_data);
 
-            if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
-              port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
-            if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
-              port_to_sync_write_position_[_dxl->port_name_]->removeParam(_dxl->id_);
-          }
-          break;
-        }
-      }
-    }
-  }
+//             if(port_to_sync_write_velocity_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_velocity_[_dxl->port_name_]->removeParam(_dxl->id_);
+//             if(port_to_sync_write_position_[_dxl->port_name_] != NULL)
+//               port_to_sync_write_position_[_dxl->port_name_]->removeParam(_dxl->id_);
+//           }
+//           break;
+//         }
+//       }
+//     }
+//   }
 
-  // enable module(s)
-  _enable_modules.unique();
-  for(std::list<MotionModule *>::iterator _m_it = _enable_modules.begin(); _m_it != _enable_modules.end(); _m_it++)
-  {
-    (*_m_it)->setModuleEnable(true);
-  }
+//   // enable module(s)
+//   _enable_modules.unique();
+//   for(std::list<MotionModule *>::iterator _m_it = _enable_modules.begin(); _m_it != _enable_modules.end(); _m_it++)
+//   {
+//     (*_m_it)->setModuleEnable(true);
+//   }
 
-  // TODO: set indirect address
-  // -> check module's control_mode
+//   // TODO: set indirect address
+//   // -> check module's control_mode
 
-  queue_mutex_.unlock();
+//   queue_mutex_.unlock();
 
-  // publish current module
-  robotis_controller_msgs::JointCtrlModule _current_module_msg;
-  for(std::map<std::string, Dynamixel *>::iterator _dxl_iter = robot_->dxls_.begin(); _dxl_iter  != robot_->dxls_.end(); ++_dxl_iter)
-  {
-    _current_module_msg.joint_name.push_back(_dxl_iter->first);
-    _current_module_msg.module_name.push_back(_dxl_iter->second->ctrl_module_name_);
-  }
+//   // publish current module
+//   // robotis_controller_msgs::JointCtrlModule _current_module_msg;
+//   // for(std::map<std::string, Dynamixel *>::iterator _dxl_iter = robot_->dxls_.begin(); _dxl_iter  != robot_->dxls_.end(); ++_dxl_iter)
+//   // {
+//   //   _current_module_msg.joint_name.push_back(_dxl_iter->first);
+//   //   _current_module_msg.module_name.push_back(_dxl_iter->second->ctrl_module_name_);
+//   // }
 
-  if(_current_module_msg.joint_name.size() == _current_module_msg.module_name.size())
-    current_module_pub_.publish(_current_module_msg);
-}
+//   // if(_current_module_msg.joint_name.size() == _current_module_msg.module_name.size())
+//   //   current_module_pub_.publish(_current_module_msg);
+// }
 
 void RobotisController::setCtrlModuleThread(std::string ctrl_module)
 {
@@ -2131,7 +2131,7 @@ void RobotisController::setCtrlModuleThread(std::string ctrl_module)
   queue_mutex_.lock();
 
   if (DEBUG_PRINT)
-    ROS_INFO_STREAM("set module : " << ctrl_module);
+    std::cout<<"set module : " << ctrl_module<<std::endl;
 
   // none
   if ((ctrl_module == "") || (ctrl_module == "none"))
@@ -2263,48 +2263,48 @@ void RobotisController::setCtrlModuleThread(std::string ctrl_module)
   queue_mutex_.unlock();
 
   // publish current module
-  robotis_controller_msgs::JointCtrlModule current_module_msg;
-  for (auto& dxl_iter : robot_->dxls_)
-  {
-    current_module_msg.joint_name.push_back(dxl_iter.first);
-    current_module_msg.module_name.push_back(dxl_iter.second->ctrl_module_name_);
-  }
+  // robotis_controller_msgs::JointCtrlModule current_module_msg;
+  // for (auto& dxl_iter : robot_->dxls_)
+  // {
+  //   current_module_msg.joint_name.push_back(dxl_iter.first);
+  //   current_module_msg.module_name.push_back(dxl_iter.second->ctrl_module_name_);
+  // }
 
-  if (current_module_msg.joint_name.size() == current_module_msg.module_name.size())
-    current_module_pub_.publish(current_module_msg);
+  // if (current_module_msg.joint_name.size() == current_module_msg.module_name.size())
+  //   current_module_pub_.publish(current_module_msg);
 }
 
-void RobotisController::gazeboJointStatesCallback(const sensor_msgs::JointState::ConstPtr &msg)
-{
-  queue_mutex_.lock();
+// void RobotisController::gazeboJointStatesCallback(const sensor_msgs::JointState::ConstPtr &msg)
+// {
+//   queue_mutex_.lock();
 
-  for (unsigned int i = 0; i < msg->name.size(); i++)
-  {
-    auto d_it = robot_->dxls_.find((std::string) msg->name[i]);
-    if (d_it != robot_->dxls_.end())
-    {
-      d_it->second->dxl_state_->present_position_ = msg->position[i];
-      d_it->second->dxl_state_->present_velocity_ = msg->velocity[i];
-      d_it->second->dxl_state_->present_torque_ = msg->effort[i];
-    }
-  }
+//   for (unsigned int i = 0; i < msg->name.size(); i++)
+//   {
+//     auto d_it = robot_->dxls_.find((std::string) msg->name[i]);
+//     if (d_it != robot_->dxls_.end())
+//     {
+//       d_it->second->dxl_state_->present_position_ = msg->position[i];
+//       d_it->second->dxl_state_->present_velocity_ = msg->velocity[i];
+//       d_it->second->dxl_state_->present_torque_ = msg->effort[i];
+//     }
+//   }
 
-  if (init_pose_loaded_ == false)
-  {
-    for (auto& it : robot_->dxls_)
-      it.second->dxl_state_->goal_position_ = it.second->dxl_state_->present_position_;
-    init_pose_loaded_ = true;
-  }
+//   if (init_pose_loaded_ == false)
+//   {
+//     for (auto& it : robot_->dxls_)
+//       it.second->dxl_state_->goal_position_ = it.second->dxl_state_->present_position_;
+//     init_pose_loaded_ = true;
+//   }
 
-  queue_mutex_.unlock();
-}
+//   queue_mutex_.unlock();
+// }
 
 bool RobotisController::isTimerStopped()
 {
   if (this->is_timer_running_)
   {
     if (DEBUG_PRINT == true)
-      ROS_WARN("Process Timer is running.. STOP the timer first.");
+      std::cout<<"Process Timer is running.. STOP the timer first."<<std::endl;
     return false;
   }
   return true;
