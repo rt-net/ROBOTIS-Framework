@@ -38,6 +38,8 @@ int main(int argc, char *argv[])
   controller->addMotionModule((robotis_framework::MotionModule *)test::TestMotionModule::getInstance());
   controller->startTimer();
 
+  controller->setCtrlModule("test_motion_module");
+
   while (true)
   {
     usleep(1000 * 1000);
